@@ -1,0 +1,4 @@
+paho-mqtt==1.6.1
+counterfit-connection==0.1.0.dev5
+counterfit-shims-grove==0.1.4.dev5
+requests==2.34.2
