@@ -130,9 +130,11 @@ In the image shown above, the bounding boxes have a small overlap. If this overl
         String tag = prediction["tagName"].as<String>();
         float probability = prediction["probability"].as<float>();
 
-        char buff[32];
-        sprintf(buff, "%s:\t%.2f%%\t%s", tag.c_str(), probability * 100.0, boundingBox.c_str());
-        Serial.println(buff);
+        Serial.print(tag);
+        Serial.print(":\t");
+        Serial.print(probability * 100.0);
+        Serial.print("%\t");
+        Serial.println(boundingBox);
     }
     ```
 
