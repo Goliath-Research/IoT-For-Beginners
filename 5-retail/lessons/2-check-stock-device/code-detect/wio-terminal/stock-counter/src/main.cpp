@@ -68,9 +68,10 @@ void processPredictions(std::vector<JsonVariant> &predictions)
         String tag = prediction["tagName"].as<String>();
         float probability = prediction["probability"].as<float>();
 
-        char buff[32];
-        sprintf(buff, "%s:\t%.2f%%", tag.c_str(), probability * 100.0);
-        Serial.println(buff);
+        Serial.print(tag);
+        Serial.print(":\t");
+        Serial.print(probability * 100.0);
+        Serial.println("%");
     }
 }
 
