@@ -1,0 +1,5 @@
+# Pins match an unpinned `import requests` in the edge fruit-detector lesson
+# (no requirements file is shipped with that sample). requests 2.26.0 is the
+# 2021 release current when the lesson's classifier logs are dated.
+requests==2.26.0
+pytest==7.4.4
