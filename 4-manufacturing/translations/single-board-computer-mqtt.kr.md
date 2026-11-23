@@ -1,5 +1,7 @@
 # 인터넷을 통해 야간 조명을 제어 해봅시다. - 가상 IoT와 Raspberry Pi
 
+> ⚠️ This translation is out of date. It connects to the public *test.mosquitto.org* broker without a username, password or TLS, which lets anyone on the Internet control your device and read its telemetry. Follow the [English version](../../1-getting-started/lessons/4-connect-internet/single-board-computer-mqtt.md) to connect to a secured MQTT broker instead.
+
 IoT 장치는 MQTT를 사용하여 *test.mosquitto.org*와 통신하도록 코딩됩니다. 이는 광센서 판독값과 함께 원격 측정값을 전송하고 LED를 제어하는 명령을 수신하기 위함입니다.
 
 이 강의에서는 여러분의  Raspberry Pi나 가상 IoT 장치에 MQTT broker를 연결하고자 합니다.

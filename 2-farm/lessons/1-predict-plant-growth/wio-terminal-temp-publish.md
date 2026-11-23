@@ -14,7 +14,7 @@ Program the device to publish the temperature data.
 
 1. Open the `temperature-sensor` Wio Terminal project
 
-1. Repeat the steps you did in lesson 4 to connect to MQTT and send telemetry, You will be using the same public Mosquitto broker.
+1. Repeat the steps you did in lesson 4 to connect to MQTT and send telemetry, You will be using the same MQTT broker as lesson 4. If you use a new ID, add `<ID>-device` and `<ID>-server` users for it to your broker's `acl` and `passwords` files.
 
     The steps for this are:
 

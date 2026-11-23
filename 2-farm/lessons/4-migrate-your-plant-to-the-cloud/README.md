@@ -16,7 +16,7 @@ This lesson was taught as part of the [IoT for Beginners Project 2 - Digital Agr
 
 In the last lesson, you learned how to connect your plant to an MQTT broker and controlled a relay from some server code running locally. This forms the core of the kind of internet-connected automated watering system that is used from individual plants at home up to commercial farms.
 
-The IoT device communicated with a public MQTT broker as a way to demonstrate the principles, but this is not the most reliable or secure way. In this lesson you will learn about the cloud, and the IoT capabilities provided by public cloud services. You will also learn how to migrate your plant to one of these cloud services from the public MQTT broker.
+The IoT device communicated with an MQTT broker you run yourself as a way to demonstrate the principles, but this is not the most reliable or scalable way. In this lesson you will learn about the cloud, and the IoT capabilities provided by public cloud services. You will also learn how to migrate your plant to one of these cloud services from your own MQTT broker.
 
 In this lesson we'll cover:
 

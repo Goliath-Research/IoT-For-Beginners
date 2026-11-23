@@ -1,5 +1,7 @@
 # 인터넷에 장치 연결하기
 
+> ⚠️ This translation is out of date. It connects to the public *test.mosquitto.org* broker without a username, password or TLS, which lets anyone on the Internet control your device and read its telemetry. Follow the [English version](../README.md) to connect to a secured MQTT broker instead.
+
 ![A sketchnote overview of this lesson](../../../../sketchnotes/lesson-4.jpg)
 
 > Nitya Narasimhan의 스케치 노트. 더 큰 버전을 보려면 이미지를 클릭하세요.

@@ -1,6 +1,6 @@
 # Control your nightlight over the Internet - Wio Terminal
 
-The IoT device needs to be coded to communicate with *test.mosquitto.org* using MQTT to send telemetry values with the light sensor reading, and receive commands to control the LED.
+The IoT device needs to be coded to communicate with your MQTT broker using MQTT to send telemetry values with the light sensor reading, and receive commands to control the LED.
 
 In this part of the lesson, you will connect your Wio Terminal to an MQTT broker.
 
@@ -80,6 +80,7 @@ Connect the Wio Terminal to WiFi.
     ```cpp
     #include <PubSubClient.h>
     #include <rpcWiFi.h>
+    #include <WiFiClientSecure.h>
     #include <SPI.h>
     
     #include "config.h"
@@ -138,26 +139,40 @@ Connect to the MQTT broker.
     // MQTT settings
     const string ID = "<ID>";
     
-    const string BROKER = "test.mosquitto.org";
+    const string BROKER = "<BROKER>";
+    const int BROKER_PORT = 8883;
+
+    // MQTT credentials for this device, issued by your broker
+    const char *MQTT_USERNAME = "<MQTT_USERNAME>";
+    const char *MQTT_PASSWORD = "<MQTT_PASSWORD>";
+
+    // Certificate of the CA that signed your broker's TLS certificate
+    const char *BROKER_CA_CERTIFICATE =
+        "-----BEGIN CERTIFICATE-----\r\n"
+        "<CA_CERTIFICATE>\r\n"
+        "-----END CERTIFICATE-----\r\n";
+
     const string CLIENT_NAME = ID + "nightlight_client";
     ```
 
-    Replace `<ID>` with a unique ID that will be used the name of this device client, and later for the topics that this device publishes and subscribes to. The *test.mosquitto.org* broker is public and used by many people, including other students working through this assignment. Having a unique MQTT client name and topic names ensures your code won't clash with anyone else's. You will also need this ID when you are creating the server code later in this assignment.
+    Replace `<ID>` with the unique ID you used when [setting up your MQTT broker](README.md#task---set-up-your-mqtt-broker). It will be used as the name of this device client, and later for the topics that this device publishes and subscribes to. You will also need this ID when you are creating the server code later in this assignment.
 
-    > 💁 You can use a website like [GUIDGen](https://www.guidgen.com) to generate a unique ID.
+    The `BROKER` is the host name of your MQTT broker. Replace `<BROKER>` with the host name you used when you created the broker's certificate.
 
-    The `BROKER` is the URL of the MQTT broker.
+    Replace `<MQTT_USERNAME>` with `<ID>-device`, and `<MQTT_PASSWORD>` with the password you created for that user. Don't commit this file to source control with your passwords in it.
+
+    Replace the `BROKER_CA_CERTIFICATE` lines with the contents of your `ca.crt` file, with each line in quotes and ending in `\r\n`. The device uses this certificate to check that it is talking to your broker.
 
     The `CLIENT_NAME` is a unique name for this MQTT client on the broker.
 
 1. Open the `main.cpp` file, and add the following code below the `connectWiFi` function and above the `setup` function:
 
     ```cpp
-    WiFiClient wioClient;
+    WiFiClientSecure wioClient;
     PubSubClient client(wioClient);
     ```
 
-    This code creates a WiFi client using the Wio Terminal WiFI libraries and uses it to create an MQTT client.
+    This code creates a secure WiFi client that uses TLS, using the Wio Terminal WiFI libraries, and uses it to create an MQTT client.
 
 1. Below this code, add the following:
 
@@ -168,7 +183,7 @@ Connect to the MQTT broker.
         {
             Serial.print("Attempting MQTT connection...");
     
-            if (client.connect(CLIENT_NAME.c_str()))
+            if (client.connect(CLIENT_NAME.c_str(), MQTT_USERNAME, MQTT_PASSWORD))
             {
                 Serial.println("connected");
             }
@@ -183,7 +198,7 @@ Connect to the MQTT broker.
     }
     ```
 
-    This function tests the connection to the MQTT broker and reconnects if it is not connected. It loops all the time it is not connected and attempts to connect using the unique client name defined in the config header file.
+    This function tests the connection to the MQTT broker and reconnects if it is not connected. It loops all the time it is not connected and attempts to connect using the unique client name, username and password defined in the config header file.
 
     If the connection fails, it retries after 5 seconds.
 
@@ -192,12 +207,13 @@ Connect to the MQTT broker.
     ```cpp
     void createMQTTClient()
     {
-        client.setServer(BROKER.c_str(), 1883);
+        wioClient.setCACert(BROKER_CA_CERTIFICATE);
+        client.setServer(BROKER.c_str(), BROKER_PORT);
         reconnectMQTTClient();
     }
     ```
 
-    This code sets the MQTT broker for the client, as well as setting up the callback when a message is received. It then attempts to connect to the broker.
+    This code sets the CA certificate the secure WiFi client uses to check the broker, and sets the MQTT broker for the client. It then attempts to connect to the broker.
 
 1. Call the `createMQTTClient` function in the `setup` function after the WiFi is connected.
 

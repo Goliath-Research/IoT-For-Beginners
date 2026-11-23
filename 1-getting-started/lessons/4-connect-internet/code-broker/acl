@@ -1,0 +1,11 @@
+# Each user can only use the topics for its own ID, and anything not listed
+# here is denied. Replace <ID> with your ID, and add another pair of users for
+# each extra ID you use.
+
+user <ID>-device
+topic write <ID>/telemetry
+topic read <ID>/commands
+
+user <ID>-server
+topic read <ID>/telemetry
+topic write <ID>/commands
