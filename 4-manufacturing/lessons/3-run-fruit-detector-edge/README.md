@@ -367,6 +367,68 @@ What you downloaded from Custom Vision was a DockerFile containing instructions 
 
 Your container can now be deployed to your IoT Edge device. To deploy you need to define a deployment manifest - a JSON document that lists the modules that will be deployed to the edge device.
 
+The classifier container only serves HTTP. Anyone on the network between your IoT device and the IoT Edge device could read every image sent over HTTP, and if your IoT Edge device is a virtual machine in the cloud, these images would travel across the internet. To keep the images private, the classifier is not exposed directly. Instead a second module running [nginx](https://nginx.org) accepts HTTPS connections on port 443 using a certificate you create, and passes the requests on to the classifier inside the IoT Edge device.
+
+### Task - create a certificate for the classifier
+
+1. Connect to the IoT Edge device. You can find instructions on how to do this in the [verify the classifier is running](#task---verify-the-classifier-is-running) task below.
+
+1. Run the following command to create a folder for the certificate:
+
+    ```sh
+    sudo mkdir -p /etc/fruit-classifier/tls
+    ```
+
+1. Run the following command to create a certificate and private key for the classifier:
+
+    ```sh
+    sudo openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 365 \
+                     -keyout /etc/fruit-classifier/tls/classifier.key \
+                     -out /etc/fruit-classifier/tls/classifier.crt \
+                     -subj "/CN=<IP address or name>" \
+                     -addext "subjectAltName=<subject alt name>"
+    ```
+
+    Replace `<IP address or name>` with the IP address or host name that your IoT device will use to connect to the IoT Edge device. If you are using a VM, use the DNS name of the VM (the `Fqdns` field).
+
+    Replace `<subject alt name>` with `DNS:<name>` if you are using a host name, for example `DNS:fruit-quality-detector-vm.westus2.cloudapp.azure.com`, or `IP:<IP address>,DNS:<IP address>` if you are using an IP address, for example `IP:192.168.1.10,DNS:192.168.1.10`. Your IoT device checks that the address it connects to is listed in the certificate, so this needs to match the URL you use.
+
+    > 💁 The private key `classifier.key` must stay on the IoT Edge device. Only the certificate `classifier.crt` is copied to your IoT device.
+
+1. Create the nginx configuration file with the following command:
+
+    ```sh
+    sudo nano /etc/fruit-classifier/classifier.conf
+    ```
+
+1. Add the following to this file, then save it:
+
+    ```nginx
+    server {
+        listen 443 ssl;
+
+        ssl_certificate     /etc/nginx/tls/classifier.crt;
+        ssl_certificate_key /etc/nginx/tls/classifier.key;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+
+        client_max_body_size 10m;
+
+        location / {
+            proxy_pass http://ImageClassifier:80;
+        }
+    }
+    ```
+
+    > 💁 You can find this file in the [code-deployment/tls-proxy](code-deployment/tls-proxy) folder.
+
+    This tells nginx to accept HTTPS connections using your certificate, and send them on to the `ImageClassifier` module. IoT Edge modules can reach each other using the module name, so this traffic never leaves the IoT Edge device.
+
+1. Show the certificate with the following command, and take a copy of the output, including the `-----BEGIN CERTIFICATE-----` and `-----END CERTIFICATE-----` lines. You will need this later on your IoT device.
+
+    ```sh
+    cat /etc/fruit-classifier/tls/classifier.crt
+    ```
+
 ### Task - create the deployment manifest
 
 1. Create a new file called `deployment.json` somewhere on your computer.
@@ -408,7 +470,7 @@ Your container can now be deployed to your IoT Edge device. To deploy you need t
                                 "restartPolicy": "always",
                                 "settings": {
                                     "image": "mcr.microsoft.com/azureiotedge-hub:1.1",
-                                    "createOptions": "{\"HostConfig\":{\"PortBindings\":{\"5671/tcp\":[{\"HostPort\":\"5671\"}],\"8883/tcp\":[{\"HostPort\":\"8883\"}],\"443/tcp\":[{\"HostPort\":\"443\"}]}}}"
+                                    "createOptions": "{\"HostConfig\":{\"PortBindings\":{\"5671/tcp\":[{\"HostPort\":\"5671\"}],\"8883/tcp\":[{\"HostPort\":\"8883\"}]}}}"
                                 }
                             }
                         },
@@ -420,7 +482,17 @@ Your container can now be deployed to your IoT Edge device. To deploy you need t
                                 "restartPolicy": "always",
                                 "settings": {
                                     "image": "<Container registry name>.azurecr.io/classifier:v1",
-                                    "createOptions": "{\"ExposedPorts\": {\"80/tcp\": {}},\"HostConfig\": {\"PortBindings\": {\"80/tcp\": [{\"HostPort\": \"80\"}]}}}"
+                                    "createOptions": "{}"
+                                }
+                            },
+                            "ClassifierTLS": {
+                                "version": "1.0",
+                                "type": "docker",
+                                "status": "running",
+                                "restartPolicy": "always",
+                                "settings": {
+                                    "image": "nginx:1.26-alpine",
+                                    "createOptions": "{\"ExposedPorts\": {\"443/tcp\": {}},\"HostConfig\": {\"Binds\": [\"/etc/fruit-classifier/classifier.conf:/etc/nginx/conf.d/default.conf:ro\", \"/etc/fruit-classifier/tls:/etc/nginx/tls:ro\"],\"PortBindings\": {\"443/tcp\": [{\"HostPort\": \"443\"}]}}}"
                                 }
                             }
                         }
@@ -447,6 +519,8 @@ Your container can now be deployed to your IoT Edge device. To deploy you need t
     Replace the three instances of`<Container registry name>` with the name you used for your container registry. One is in the `ImageClassifier` module section, the other two are in the `registryCredentials` section.
 
     Replace `<Container registry password>` in the `registryCredentials` section with your container registry password.
+
+    The `ImageClassifier` module doesn't publish any ports, so it can't be reached over HTTP from outside the IoT Edge device. The `ClassifierTLS` module publishes port 443, the standard HTTPS port, and loads the configuration and certificate you created from the `/etc/fruit-classifier` folder. The `edgeHub` module normally publishes port 443 as well, but this is only needed for devices that connect to IoT Hub through the IoT Edge device, which this lesson doesn't use, so it has been removed to free up the port.
 
 1. From the folder containing your deployment manifest, run the following command:
 
@@ -494,6 +568,7 @@ Your container can now be deployed to your IoT Edge device. To deploy you need t
     jim@fruit-quality-detector-jimb:~$ iotedge list
     NAME             STATUS           DESCRIPTION      CONFIG
     ImageClassifier  running          Up 42 minutes    fruitqualitydetectorjimb.azurecr.io/classifier:v1
+    ClassifierTLS    running          Up 42 minutes    nginx:1.26-alpine
     edgeAgent        running          Up 42 minutes    mcr.microsoft.com/azureiotedge-agent:1.1
     edgeHub          running          Up 42 minutes    mcr.microsoft.com/azureiotedge-hub:1.1
     ```
@@ -524,25 +599,29 @@ Your container can now be deployed to your IoT Edge device. To deploy you need t
 
 ### Task - test the image classifier
 
-1. You can use CURL to test the image classifier using the IP address or host name of the computer that is running the IoT Edge agent. Find the IP address:
+1. You can use CURL to test the image classifier using the IP address or host name of the computer that is running the IoT Edge agent. This needs to be the same IP address or host name that you used when you created the certificate. Find the IP address:
 
-    * If you are on the same machine that IoT Edge is running, you can use `localhost` as the host name.
     * If you are using a VM, you can use either the IP address or the DNS name of the VM
     * Otherwise you can obtain the IP address of the machine running IoT Edge:
       * On Windows 10, follow the [find your IP address guide](https://support.microsoft.com/windows/find-your-ip-address-f21a9bbc-c582-55cd-35e0-73431160a1b9?WT.mc_id=academic-17441-jabenn)
       * On macOS, follow the [how to find you IP address on a Mac guide](https://www.hellotech.com/guide/for/how-to-find-ip-address-on-mac)
       * On linux, follow the section on finding your private IP address in the [how to find your IP address in Linux guide](https://opensource.com/article/18/5/how-find-ip-address-linux)
 
+1. Save the certificate you copied from the IoT Edge device into a file called `classifier.crt` on the computer you are testing from.
+
 1. You can test the container with a local file by running the following curl command:
 
     ```sh
-    curl --location \
-         --request POST 'http://<IP address or name>/image' \
+    curl --proto '=https' \
+         --cacert classifier.crt \
+         --request POST 'https://<IP address or name>/image' \
          --header 'Content-Type: image/png' \
          --data-binary '@<file_Name>' 
     ```
 
     Replace `<IP address or name>` with the IP address or host name of the computer running IoT Edge. Replace `<file_Name>` with the name of the file to test.
+
+    The `--cacert` option tells curl to trust your classifier's certificate, and `--proto '=https'` stops curl from sending the image if the URL is not HTTPS.
 
     You will see the prediction results in the output:
 
@@ -569,7 +648,7 @@ Your container can now be deployed to your IoT Edge device. To deploy you need t
     }
     ```
 
-    > 💁 There is no need to provide a prediction key here, as this is not using an Azure resource. Instead security would be configured on the internal network based on internal security needs, rather than relying on a public endpoint and an API key.
+    > 💁 There is no need to provide a prediction key here, as this is not using an Azure resource. Instead security would be configured on the internal network based on internal security needs, rather than relying on a public endpoint and an API key. The images are still sent over HTTPS, so they can't be read by anyone else on the network.
 
 ## Use your IoT Edge device
 

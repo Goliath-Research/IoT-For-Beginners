@@ -5,14 +5,14 @@
 #include "SD/Seeed_SD.h"
 #include <Seeed_FS.h>
 #include <SPI.h>
-#include <WiFiClient.h>
+#include <WiFiClientSecure.h>
 
 #include "config.h"
 #include "camera.h"
 
 Camera camera = Camera(JPEG, OV2640_640x480);
 
-WiFiClient client;
+WiFiClientSecure client;
 
 void setupCamera()
 {
@@ -38,6 +38,8 @@ void connectWiFi()
     }
 
     Serial.println("Connected!");
+
+    client.setCACert(CERTIFICATE);
 }
 
 void setup()
@@ -58,6 +60,12 @@ void setup()
 
 void classifyImage(byte *buffer, uint32_t length)
 {
+    if (strncmp(PREDICTION_URL, "https://", 8) != 0)
+    {
+        Serial.println("PREDICTION_URL must start with https://, not sending the image");
+        return;
+    }
+
     HTTPClient httpClient;
     httpClient.begin(client, PREDICTION_URL);
     httpClient.addHeader("Content-Type", "application/octet-stream");

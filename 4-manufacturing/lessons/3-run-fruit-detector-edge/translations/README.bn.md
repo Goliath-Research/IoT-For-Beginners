@@ -367,6 +367,8 @@ Edge এ ক্লাসিফায়ার চালানোর জন্য
 
 কন্টেইনার এখন আইওটি এজ ডিভাইসে স্থাপন করা যেতে পারে। ডেপ্লয় করার জন্য একটি deployment manifest কে ডিফাইন করতে হবে - এটি একটি JSON ডকুমেন্ট যা Edgeডিভাইসে মডিউলগুলি তালিকাভুক্ত করে।
 
+> 💁 The classifier is only reachable over HTTPS, through the `ClassifierTLS` module in the deployment manifest below. Before you deploy, follow the [create a certificate for the classifier](../README.md#task---create-a-certificate-for-the-classifier) task in the English lesson to create the certificate and the nginx configuration on your IoT Edge device.
+
 ### কাজ - deployment manifest তৈরী করা
 
 1. আমাদের কম্পিউটারে `deployment.json` নামে একটি ফাইল তৈরী করি।
@@ -408,7 +410,7 @@ Edge এ ক্লাসিফায়ার চালানোর জন্য
                                 "restartPolicy": "always",
                                 "settings": {
                                     "image": "mcr.microsoft.com/azureiotedge-hub:1.1",
-                                    "createOptions": "{\"HostConfig\":{\"PortBindings\":{\"5671/tcp\":[{\"HostPort\":\"5671\"}],\"8883/tcp\":[{\"HostPort\":\"8883\"}],\"443/tcp\":[{\"HostPort\":\"443\"}]}}}"
+                                    "createOptions": "{\"HostConfig\":{\"PortBindings\":{\"5671/tcp\":[{\"HostPort\":\"5671\"}],\"8883/tcp\":[{\"HostPort\":\"8883\"}]}}}"
                                 }
                             }
                         },
@@ -420,7 +422,17 @@ Edge এ ক্লাসিফায়ার চালানোর জন্য
                                 "restartPolicy": "always",
                                 "settings": {
                                     "image": "<Container registry name>.azurecr.io/classifier:v1",
-                                    "createOptions": "{\"ExposedPorts\": {\"80/tcp\": {}},\"HostConfig\": {\"PortBindings\": {\"80/tcp\": [{\"HostPort\": \"80\"}]}}}"
+                                    "createOptions": "{}"
+                                }
+                            },
+                            "ClassifierTLS": {
+                                "version": "1.0",
+                                "type": "docker",
+                                "status": "running",
+                                "restartPolicy": "always",
+                                "settings": {
+                                    "image": "nginx:1.26-alpine",
+                                    "createOptions": "{\"ExposedPorts\": {\"443/tcp\": {}},\"HostConfig\": {\"Binds\": [\"/etc/fruit-classifier/classifier.conf:/etc/nginx/conf.d/default.conf:ro\", \"/etc/fruit-classifier/tls:/etc/nginx/tls:ro\"],\"PortBindings\": {\"443/tcp\": [{\"HostPort\": \"443\"}]}}}"
                                 }
                             }
                         }
@@ -494,6 +506,7 @@ Edge এ ক্লাসিফায়ার চালানোর জন্য
     jim@fruit-quality-detector-jimb:~$ iotedge list
     NAME             STATUS           DESCRIPTION      CONFIG
     ImageClassifier  running          Up 42 minutes    fruitqualitydetectorjimb.azurecr.io/classifier:v1
+    ClassifierTLS    running          Up 42 minutes    nginx:1.26-alpine
     edgeAgent        running          Up 42 minutes    mcr.microsoft.com/azureiotedge-agent:1.1
     edgeHub          running          Up 42 minutes    mcr.microsoft.com/azureiotedge-hub:1.1
     ```
@@ -536,11 +549,14 @@ Edge এ ক্লাসিফায়ার চালানোর জন্য
 1. কন্টেইনারকে লোকাল ফাইল দিয়ে টেস্ট করতে নীচের curl কমান্ড ব্যবহার করি:
 
     ```sh
-    curl --location \
-         --request POST 'http://<IP address or name>/image' \
+    curl --proto '=https' \
+         --cacert classifier.crt \
+         --request POST 'https://<IP address or name>/image' \
          --header 'Content-Type: image/png' \
          --data-binary '@<file_Name>' 
     ```
+
+    > 💁 `classifier.crt` is the certificate you created on the IoT Edge device. `<IP address or name>` must match the name in that certificate.
 
     `<IP address or name>` এর জায়গায় আমাদের IP address বা host name দিই যেটি থেকে IoT Edge চলছে এবং `<file_Name>` ঙ্গের জায়গায় যে ফাইল দিয়ে টেস্ট করা হবে, সেটির নাম দিই।
 
