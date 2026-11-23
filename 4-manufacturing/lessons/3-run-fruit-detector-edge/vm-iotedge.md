@@ -55,7 +55,7 @@ In Azure, you can create a virtual machine - a computer in the cloud that you ca
 
     Replace `<shutdown_time_utc>` with the UTC time that you want the VM to shut down using 4 digits as HHMM. For example, if you want to shutdown at midnight UTC, you would set this to `0000`. For 7:30PM on the west coast of the USA, you would use 0230 (7:30PM on the US west coast is 2:30AM UTC).
 
-1. Your image classifier will be running on this edge device, listening on port 80 (the standard HTTP port). By default, virtual machines have inbound ports blocked, so you will need to enable port 80. Ports are enabled on network security groups, so first you need to know the name of the network security group for your VM, which you can find with the following command:
+1. Your image classifier will be running on this edge device, listening on port 443 (the standard HTTPS port). By default, virtual machines have inbound ports blocked, so you will need to enable port 443. Ports are enabled on network security groups, so first you need to know the name of the network security group for your VM, which you can find with the following command:
 
     ```sh
     az network nsg list --resource-group fruit-quality-detector \
@@ -64,19 +64,21 @@ In Azure, you can create a virtual machine - a computer in the cloud that you ca
 
     Copy the value of the `Name` field.
 
-1. Run the following command to add a rule to open port 80 to the network security group:
+1. Run the following command to add a rule to open port 443 to the network security group:
 
     ```sh
     az network nsg rule create \
                         --resource-group fruit-quality-detector \
-                        --name Port_80 \
+                        --name Port_443 \
                         --protocol tcp \
                         --priority 1010 \
-                        --destination-port-range 80 \
+                        --destination-port-range 443 \
                         --nsg-name <nsg name>
     ```
 
     Replace `<nsg name>` with the network security group name from the previous step.
+
+    > 💁 Don't open port 80. The classifier only accepts HTTPS connections on port 443, so the images sent to it from your IoT device are encrypted as they travel across the internet to your VM.
 
 ### Task - manage your VM to reduce costs
 
