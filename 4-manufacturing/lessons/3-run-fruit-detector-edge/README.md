@@ -527,7 +527,7 @@ Your container can now be deployed to your IoT Edge device. To deploy you need t
 1. You can use CURL to test the image classifier using the IP address or host name of the computer that is running the IoT Edge agent. Find the IP address:
 
     * If you are on the same machine that IoT Edge is running, you can use `localhost` as the host name.
-    * If you are using a VM, you can use either the IP address or the DNS name of the VM
+    * If you are using a VM, you can use either the IP address or the DNS name of the VM. Port 80 on the VM is only open to your own public IP address, so run this from a computer on your own network
     * Otherwise you can obtain the IP address of the machine running IoT Edge:
       * On Windows 10, follow the [find your IP address guide](https://support.microsoft.com/windows/find-your-ip-address-f21a9bbc-c582-55cd-35e0-73431160a1b9?WT.mc_id=academic-17441-jabenn)
       * On macOS, follow the [how to find you IP address on a Mac guide](https://www.hellotech.com/guide/for/how-to-find-ip-address-on-mac)
