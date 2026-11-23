@@ -64,7 +64,15 @@ In Azure, you can create a virtual machine - a computer in the cloud that you ca
 
     Copy the value of the `Name` field.
 
-1. Run the following command to add a rule to open port 80 to the network security group:
+1. The image classifier doesn't need a prediction key, so anyone who can reach port 80 can send it images and use your VM. To prevent this, you will only open port 80 to the public IP address of your own network. Find this address by searching for *what is my IP address* in [Bing](https://www.bing.com/search?q=what+is+my+ip+address), or by running the following command:
+
+    ```sh
+    curl https://api.ipify.org
+    ```
+
+    Take a copy of the IP address. This is the address your computer and IoT device use to reach the internet, not the private address of your computer on your local network.
+
+1. Run the following command to add a rule to open port 80 to your IP address only:
 
     ```sh
     az network nsg rule create \
@@ -72,11 +80,23 @@ In Azure, you can create a virtual machine - a computer in the cloud that you ca
                         --name Port_80 \
                         --protocol tcp \
                         --priority 1010 \
-                        --destination-port-range 80 \
+                        --source-address-prefixes <your_ip_address>/32 \
+                        --destination-port-ranges 80 \
                         --nsg-name <nsg name>
     ```
 
-    Replace `<nsg name>` with the network security group name from the previous step.
+    Replace `<your_ip_address>` with your public IP address from the previous step, and `<nsg name>` with the network security group name from the step before that.
+
+    > ⚠️ Don't use `*`, `Internet`, `Any` or `0.0.0.0/0` as the source address, and don't leave out `--source-address-prefixes`. If you do, the rule opens port 80 to every address on the internet.
+
+    > 💁 Your public IP address can change, for example when your router restarts. If you can no longer reach the image classifier, find your new IP address and update the rule using the following command:
+    >
+    > ```sh
+    > az network nsg rule update --resource-group fruit-quality-detector \
+    >                            --name Port_80 \
+    >                            --source-address-prefixes <your_ip_address>/32 \
+    >                            --nsg-name <nsg name>
+    > ```
 
 ### Task - manage your VM to reduce costs
 
