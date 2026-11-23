@@ -59,15 +59,68 @@ The first part of adding Internet control to your nightlight is connecting it to
 
 Connect your device to an MQTT broker.
 
-In this part of the lesson, you will connect your IoT nightlight to the internet to allow it to be remotely controlled. Later in this lesson, your IoT device will send a telemetry message over MQTT to a public MQTT broker with the light level, where it will be picked up by some server code that you will write. This code will check the light level and send a command message back to the device telling it to turn the LED on or off.
+In this part of the lesson, you will connect your IoT nightlight to the internet to allow it to be remotely controlled. Later in this lesson, your IoT device will send a telemetry message over MQTT to an MQTT broker with the light level, where it will be picked up by some server code that you will write. This code will check the light level and send a command message back to the device telling it to turn the LED on or off.
 
 The real-world use case for such a setup could be to gather data from multiple light sensors before deciding to turn on lights, in a location that has a lot of lights, such as a stadium. This could stop the lights from being turned on if only one sensor was covered by clouds or a bird, but the other sensors detected enough light.
 
 ✅ What other situations would require data from multiple sensors to be evaluated before sending commands?
 
-Rather than dealing with the complexities of setting up an MQTT broker as part of this assignment, you can use a public test server that runs [Eclipse Mosquitto](https://www.mosquitto.org), an open-source MQTT broker. This test broker is publicly available at [test.mosquitto.org](https://test.mosquitto.org), and doesn't require an account to be set up, making it a great tool for testing MQTT clients and servers.
+Your nightlight will do whatever the messages on its command topic tell it to, so the broker has to make sure only your server can send those messages. Don't use a public test broker that anyone can connect to without logging in, such as *test.mosquitto.org*. Anyone on the Internet could turn your LED on and off, or read your light levels, just by knowing your topic names. Instead, use a broker you control that:
 
-> 💁 This test broker is public and not secure. Anyone could be listening to what you publish, so it should not be used with any data that needs to be kept private
+* only accepts encrypted connections using TLS,
+* requires every client to log in with its own username and password, and
+* only lets each client use its own topics.
+
+You can run [Eclipse Mosquitto](https://www.mosquitto.org), an open-source MQTT broker, on your computer or on a Raspberry Pi using the configuration in the [code-broker](code-broker) folder, or use a hosted MQTT broker that supports these three features.
+
+#### Task - set up your MQTT broker
+
+1. [Install Mosquitto](https://mosquitto.org/download/) and [OpenSSL](https://www.openssl.org) on the computer that will run the broker. The commands below use OpenSSL 3.
+
+1. Copy the [code-broker](code-broker) folder to that computer, and open a terminal in it.
+
+1. Choose a unique ID. You will use this ID for your device and server code, and for the names of the MQTT topics they use. Replace `<ID>` in the `acl` file with this ID.
+
+    > 💁 You can use a website like [GUIDGen](https://www.guidgen.com) to generate a unique ID.
+
+    The ID is a name, not a password. The `acl` file makes sure that only the `<ID>-device` user can publish telemetry and only the `<ID>-server` user can send commands, so it doesn't matter if other people know your ID.
+
+1. Create a certificate authority (CA) and a TLS certificate for the broker. Replace `<BROKER>` with the host name your device and server will use to connect to the broker, for example `localhost` or `raspberrypi.local`. If you connect using an IP address, use `IP:<BROKER>` instead of `DNS:<BROKER>`.
+
+    ```sh
+    mkdir certs
+    openssl req -x509 -newkey rsa:2048 -nodes -days 365 -subj "/CN=MQTT broker CA" -keyout certs/ca.key -out certs/ca.crt
+    openssl req -newkey rsa:2048 -nodes -subj "/CN=<BROKER>" -addext "subjectAltName=DNS:<BROKER>" -keyout certs/server.key -out certs/server.csr
+    openssl x509 -req -in certs/server.csr -CA certs/ca.crt -CAkey certs/ca.key -CAcreateserial -days 365 -copy_extensions copy -out certs/server.crt
+    ```
+
+    Your device and server code need a copy of `certs/ca.crt` so they can check they are talking to your broker. Keep `certs/ca.key` and `certs/server.key` private.
+
+1. Create a password for the device and for the server. Replace `<ID>` with your ID, and enter a different strong password for each user when asked:
+
+    ```sh
+    mosquitto_passwd -c passwords <ID>-device
+    mosquitto_passwd passwords <ID>-server
+    ```
+
+1. Start the broker:
+
+    ```sh
+    mosquitto -c mosquitto.conf
+    ```
+
+    The broker listens on port 8883, and refuses any client that doesn't log in.
+
+Your device and server code read the broker details from these environment variables:
+
+| Variable | Value |
+| -------- | ----- |
+| `MQTT_BROKER` | The host name you used for `<BROKER>` |
+| `MQTT_USERNAME` | `<ID>-device` for the device, `<ID>-server` for the server |
+| `MQTT_PASSWORD` | The password for that user |
+| `MQTT_CA_CERTS` | The path to your copy of `ca.crt`. Leave this unset if your broker uses a certificate from a public CA |
+
+Keep the passwords out of your code, and don't commit them to source control. The Wio Terminal doesn't have environment variables, so you will put these values in its `config.h` file instead.
 
 ![A flow chart of the assignment showing light levels being read and checked, and the LED begin controlled](../../../images/assignment-1-internet-flow.png)
 
@@ -92,9 +145,9 @@ Although the name is Message Queueing (initials in MQTT), it doesn't actually su
 
 MQTT also supports a keep alive function that checks if the connection is still alive during long gaps between messages.
 
-> 🦟 [Mosquitto from the Eclipse Foundation](https://mosquitto.org) has a free MQTT broker you can run yourself to experiment with MQTT, along with a public MQTT broker you can use to test your code, hosted at [test.mosquitto.org](https://test.mosquitto.org).
+> 🦟 [Mosquitto from the Eclipse Foundation](https://mosquitto.org) has a free MQTT broker you can run yourself to experiment with MQTT.
 
-MQTT connections can be public and open, or encrypted and secured using usernames and passwords, or certificates.
+MQTT connections can be public and open, or encrypted and secured using usernames and passwords, or certificates. Any device that can be controlled over MQTT should only use encrypted, secured connections.
 
 > 💁 MQTT communicates over TCP/IP, the same underlying network protocol as HTTP, but on a different port. You can also use MQTT over websockets to communicate with web apps running in a browser, or in situations where firewalls or other networking rules block standard MQTT connections.
 
@@ -277,6 +330,7 @@ Write the server code.
 
     ```python
     import json
+    import os
     import time
     
     import paho.mqtt.client as mqtt
@@ -287,7 +341,9 @@ Write the server code.
     client_name = id + 'nightlight_server'
     
     mqtt_client = mqtt.Client(client_name)
-    mqtt_client.connect('test.mosquitto.org')
+    mqtt_client.username_pw_set(os.environ['MQTT_USERNAME'], os.environ['MQTT_PASSWORD'])
+    mqtt_client.tls_set(ca_certs=os.environ.get('MQTT_CA_CERTS'))
+    mqtt_client.connect(os.environ['MQTT_BROKER'], 8883)
     
     mqtt_client.loop_start()
     
@@ -302,17 +358,17 @@ Write the server code.
         time.sleep(2)
     ```
 
-    Replace `<ID>` on line 6 with the unique ID you used when creating your device code.
+    Replace `<ID>` on line 7 with the unique ID you used when creating your device code.
 
     ⚠️ This **must** be the same ID that you used on your device, or the server code won't subscribe or publish to the right topic.
 
-    This code creates an MQTT client with a unique name, and connects to the *test.mosquitto.org* broker. It then starts a processing loop that runs in on a background thread listening for messages on any subscribed topics.
+    This code creates an MQTT client with a unique name, and connects to your MQTT broker over TLS, logging in with the server's username and password. It then starts a processing loop that runs in on a background thread listening for messages on any subscribed topics.
 
     The client then subscribes to messages on the telemetry topic, and defines a function that is called when a message is received. When a telemetry message is received, the `handle_telemetry` function is called, printing the message received to the console.
 
     Finally an infinite loop keeps the application running. The MQTT client is listening to messages on a background thread and runs all the time the main application is running.
 
-1. From the VS Code terminal, run the following to run your Python app:
+1. From the VS Code terminal, set the `MQTT_BROKER`, `MQTT_USERNAME`, `MQTT_PASSWORD` and `MQTT_CA_CERTS` environment variables for the `<ID>-server` user, then run the following to run your Python app:
 
     ```sh
     python app.py
@@ -440,15 +496,9 @@ For these devices, think about what messages they might be sending or receiving.
 
 Read more on MQTT on the [MQTT Wikipedia page](https://wikipedia.org/wiki/MQTT).
 
-Try running an MQTT broker yourself using [Mosquitto](https://www.mosquitto.org) and connect to it from your IoT device and server code.
+Read the [`mosquitto.conf` documentation](https://www.mosquitto.org/man/mosquitto-conf-5.html) to learn more about the settings used in the [code-broker](code-broker) configuration, and try giving each of your devices its own username, password and topics.
 
-> 💁 Tip - by default Mosquitto doesn't allow anonymous connections (that is connecting without a username and password), and doesn't allow connections from outside of the computer it's running on.
-> You can fix this with a [`mosquitto.conf` config file](https://www.mosquitto.org/man/mosquitto-conf-5.html) with the following:
->
-> ```sh
-> listener 1883 0.0.0.0
-> allow_anonymous true
-> ```
+> 💁 By default Mosquitto doesn't allow anonymous connections (that is connecting without a username and password). Keep it that way for any broker that devices take commands from, otherwise anyone who can reach the broker can control them.
 
 ## Assignment
 

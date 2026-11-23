@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <PubSubClient.h>
 #include <rpcWiFi.h>
+#include <WiFiClientSecure.h>
 #include <SPI.h>
 
 #include "config.h"
@@ -17,7 +18,7 @@ void connectWiFi()
     Serial.println("Connected!");
 }
 
-WiFiClient wioClient;
+WiFiClientSecure wioClient;
 PubSubClient client(wioClient);
 
 void reconnectMQTTClient()
@@ -26,7 +27,7 @@ void reconnectMQTTClient()
     {
         Serial.print("Attempting MQTT connection...");
 
-        if (client.connect(CLIENT_NAME.c_str()))
+        if (client.connect(CLIENT_NAME.c_str(), MQTT_USERNAME, MQTT_PASSWORD))
         {
             Serial.println("connected");
         }
@@ -42,7 +43,8 @@ void reconnectMQTTClient()
 
 void createMQTTClient()
 {
-    client.setServer(BROKER.c_str(), 1883);
+    wioClient.setCACert(BROKER_CA_CERTIFICATE);
+    client.setServer(BROKER.c_str(), BROKER_PORT);
     reconnectMQTTClient();
 }
 

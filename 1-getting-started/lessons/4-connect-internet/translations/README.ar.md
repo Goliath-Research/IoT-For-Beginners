@@ -1,5 +1,7 @@
 # <div dir="rtl">قم بتوصيل جهازك بالإنترنت</div>
 
+> ⚠️ This translation is out of date. It connects to the public *test.mosquitto.org* broker without a username, password or TLS, which lets anyone on the Internet control your device and read its telemetry. Follow the [English version](../README.md) to connect to a secured MQTT broker instead.
+
 ![A sketchnote overview of this lesson](../../../../sketchnotes/lesson-4.jpg)
 > Sketchnote by [Nitya Narasimhan](https://github.com/nitya). Click the image for a larger version.
 

@@ -1,4 +1,5 @@
 import json
+import os
 import time
 
 import paho.mqtt.client as mqtt
@@ -10,7 +11,9 @@ server_command_topic = id + '/commands'
 client_name = id + 'soilmoisturesensor_server'
 
 mqtt_client = mqtt.Client(client_name)
-mqtt_client.connect('test.mosquitto.org')
+mqtt_client.username_pw_set(os.environ['MQTT_USERNAME'], os.environ['MQTT_PASSWORD'])
+mqtt_client.tls_set(ca_certs=os.environ.get('MQTT_CA_CERTS'))
+mqtt_client.connect(os.environ['MQTT_BROKER'], 8883)
 
 mqtt_client.loop_start()
 

@@ -10,7 +10,7 @@ The next step is to connect your device to IoT Hub.
 
 1. Open the `soil-moisture-sensor` project in VS Code
 
-1. Open the `platformio.ini` file. Remove the `knolleary/PubSubClient` library dependency. This was used to connect to the public MQTT broker, and is not needed to connect to IoT Hub.
+1. Open the `platformio.ini` file. Remove the `knolleary/PubSubClient` library dependency. This was used to connect to your MQTT broker, and is not needed to connect to IoT Hub.
 
 1. Add the following library dependencies:
 
